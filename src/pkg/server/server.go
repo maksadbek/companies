@@ -1,16 +1,15 @@
 package server
 
 import (
+	"companies/pkg/types"
 	"encoding/csv"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"sync"
-
-	"companies/pkg/types"
+	"time"
 )
 
 type Server struct {
@@ -19,6 +18,7 @@ type Server struct {
 
 	companiesMutex sync.RWMutex
 	companies []*types.Company
+	removedCompaniesCount int
 	companiesByName map[string]*types.Company
 	companiesByINN map[string]*types.Company
 }
@@ -31,6 +31,13 @@ func New(file *os.File) (*Server, error) {
 	}
 
 	err := s.syncIndices()
+
+	time.AfterFunc(time.Minute * 20, func() {
+		for {
+			s.maybeCleanCompanies()
+			time.Sleep(time.Minute * 20)
+		}
+	})
 
 	return s, err
 }
@@ -97,8 +104,14 @@ func (s *Server) DeleteCompany(w http.ResponseWriter, r *http.Request) {
 	s.companiesMutex.Lock()
 	if c, ok := s.companiesByName[id]; ok {
 		c.Removed = true
+		delete(s.companiesByName, id)
+		delete(s.companiesByINN, c.INN)
+		s.removedCompaniesCount += 1
 	} else if c, ok := s.companiesByINN[id]; ok {
 		c.Removed = true
+		delete(s.companiesByINN, id)
+		delete(s.companiesByName, c.Name)
+		s.removedCompaniesCount += 1
 	}
 	s.companiesMutex.Unlock()
 }
@@ -136,8 +149,6 @@ func (s *Server) syncIndices() error {
 		return err
 	}
 
-	fmt.Println(companies)
-
 	s.companiesMutex.Lock()
 	s.companies = companies
 	for _, company := range companies {
@@ -146,9 +157,37 @@ func (s *Server) syncIndices() error {
 	}
 	s.companiesMutex.Unlock()
 
-	fmt.Println(s.companiesByName)
+	log.Printf("synced indices: size: %v", len(companies))
 
 	return nil
+}
+
+// maybeCleanCompanies заново строит массив s.companies из хеш таблицы s.companiesByName
+// потому что когда удаляем записи, они не сразу удаляются из этого массива,
+// а отмечаются как company.Removed=true. Из-за этого массив может распухнуть со временем.
+func (s *Server) maybeCleanCompanies() {
+	removesCount := 0
+	actualCount := 0
+
+	s.companiesMutex.Lock()
+	removesCount = s.removedCompaniesCount
+	actualCount = len(s.companies)
+	s.companiesMutex.Unlock()
+
+	if removesCount * 2 < actualCount {
+		return
+	}
+
+	var companies []*types.Company
+
+	log.Printf("cleaning array: array size: %v, map size: %v", len(s.companies), len(s.companiesByName))
+
+	s.companiesMutex.Lock()
+	for _, company := range s.companiesByName {
+		companies = append(companies, company)
+	}
+	s.companies = companies
+	s.companiesMutex.Unlock()
 }
 
 func (s *Server) flushChangesToFile() error {
