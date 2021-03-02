@@ -2,8 +2,8 @@ POST http://localhost:8080/add
 Content-type: application/json
 
 {
-	"name": "intuit",
-	"inn": "inn",
+	"name": "blabla",
+	"inn": "12312313",
 	"phone": "897442323",
 	"address": "moscow",
 	"individual": "bond, james bond"
@@ -11,4 +11,4 @@ Content-type: application/json
 
 ###
 
-DELETE http://localhost:8080/delete?id=intuit
+DELETE http://localhost:8080/delete?id=abc
