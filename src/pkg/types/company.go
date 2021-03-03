@@ -3,10 +3,10 @@ package types
 import "hash/crc32"
 
 type Company struct {
-	Name string `json:"name"`
-	INN string `json:"inn"`
-	Phone string `json:"phone"`
-	Address string `json:"address"`
+	Name       string `json:"name"`
+	INN        string `json:"inn"`
+	Phone      string `json:"phone"`
+	Address    string `json:"address"`
 	Individual string `json:"individual"`
 
 	// Meta
@@ -18,6 +18,3 @@ func (c *Company) Hash() uint32 {
 
 	return crc32.ChecksumIEEE([]byte(payload))
 }
-
-
-

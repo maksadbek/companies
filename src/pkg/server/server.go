@@ -13,26 +13,26 @@ import (
 )
 
 type Server struct {
-	csvFile *os.File
+	csvFile      *os.File
 	csvFileMutex sync.Mutex
 
-	companiesMutex sync.RWMutex
-	companies []*types.Company
+	companiesMutex        sync.RWMutex
+	companies             []*types.Company
 	removedCompaniesCount int
-	companiesByName map[string]*types.Company
-	companiesByINN map[string]*types.Company
+	companiesByName       map[string]*types.Company
+	companiesByINN        map[string]*types.Company
 }
 
 func New(file *os.File) (*Server, error) {
 	s := &Server{
-		csvFile: file,
-		companiesByINN: make(map[string]*types.Company),
+		csvFile:         file,
+		companiesByINN:  make(map[string]*types.Company),
 		companiesByName: make(map[string]*types.Company),
 	}
 
 	err := s.syncIndices()
 
-	time.AfterFunc(time.Minute * 20, func() {
+	time.AfterFunc(time.Minute*20, func() {
 		for {
 			s.maybeCleanCompanies()
 			time.Sleep(time.Minute * 20)
@@ -124,12 +124,12 @@ func (s *Server) readCompaniesFromFile() ([]*types.Company, error) {
 	var companies []*types.Company
 
 	rec, err := reader.Read()
-	for  err == nil {
+	for err == nil {
 		companies = append(companies, &types.Company{
-			Name: rec[0],
-			INN: rec[1],
-			Phone: rec[2],
-			Address: rec[3],
+			Name:       rec[0],
+			INN:        rec[1],
+			Phone:      rec[2],
+			Address:    rec[3],
 			Individual: rec[4],
 		})
 
@@ -174,7 +174,7 @@ func (s *Server) maybeCleanCompanies() {
 	actualCount = len(s.companies)
 	s.companiesMutex.Unlock()
 
-	if removesCount * 2 < actualCount {
+	if removesCount*2 < actualCount {
 		return
 	}
 

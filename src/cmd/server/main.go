@@ -35,4 +35,3 @@ func main() {
 
 	http.ListenAndServe(*addr, mux)
 }
-

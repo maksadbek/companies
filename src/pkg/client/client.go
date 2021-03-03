@@ -13,10 +13,10 @@ import (
 )
 
 type Client struct {
-	httpClient *http.Client
+	httpClient     *http.Client
 	updateInterval time.Duration
-	db *sql.DB
-	serverAddr string
+	db             *sql.DB
+	serverAddr     string
 
 	companies map[string]*types.Company
 }
@@ -44,9 +44,9 @@ func New(dsn, serverAddr string, dur time.Duration) (*Client, error) {
 			},
 		},
 		updateInterval: dur,
-		db: db,
-		serverAddr: serverAddr,
-		companies: make(map[string]*types.Company),
+		db:             db,
+		serverAddr:     serverAddr,
+		companies:      make(map[string]*types.Company),
 	}
 
 	err = client.initializeCompanies()
@@ -121,7 +121,7 @@ func (c *Client) updateDatabase() (map[string]*types.Company, error) {
 			log.Printf("panic occured, rollback: %v", err)
 			tx.Rollback()
 		}
-	} ()
+	}()
 
 	addQuery := `insert into companies(name, inn, phone, address, individual) values ($1, $2, $3, $4, $5)`
 	for _, company := range add {
@@ -165,7 +165,7 @@ func (c *Client) updateDatabase() (map[string]*types.Company, error) {
 		return nil, err
 	}
 
-	return newCompanies,tx.Commit()
+	return newCompanies, tx.Commit()
 }
 
 func (c *Client) getCompanyList() ([]*types.Company, error) {
