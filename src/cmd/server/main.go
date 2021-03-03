@@ -14,6 +14,8 @@ var (
 )
 
 func main() {
+	flag.Parse()
+
 	csvFile, err := os.OpenFile(*file, os.O_RDWR, 0644)
 	if err != nil {
 		log.Fatalf("failed to open csv file %s: %s", *file, err.Error())

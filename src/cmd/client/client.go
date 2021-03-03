@@ -15,6 +15,8 @@ var (
 )
 
 func main() {
+	flag.Parse()
+
 	c, err := client.New(*dsn, *serverAddr, *updateInterval)
 	if err != nil {
 		log.Fatalf("failed to create a client: %v", err)
