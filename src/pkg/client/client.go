@@ -84,27 +84,28 @@ func (c *Client) initializeCompanies() error {
 
 func (c *Client) Run() error {
 	for {
-		err := c.updateDatabase()
+		companies, err := c.updateDatabase()
 		if err != nil {
 			log.Printf("failed to update database: %v", err)
 		} else {
 			log.Print("successfully updated database")
+			c.companies = companies
 		}
 
 		time.Sleep(c.updateInterval)
 	}
 }
 
-func (c *Client) updateDatabase() error {
+func (c *Client) updateDatabase() (map[string]*types.Company, error) {
 	companies, err := c.getCompanyList()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	add, del := c.diff(companies)
+	add, del, change, newCompanies := c.diff(companies)
 	var delNames []string
 
-	log.Printf("updating database: actual: %v, add: %v, del: %v", len(c.companies), len(add), len(del))
+	log.Printf("updating database: actual: %v, add: %v, del: %v, change: %v", len(c.companies), len(add), len(del), len(change))
 
 	for _, d := range del {
 		delNames = append(delNames, d.Name)
@@ -112,7 +113,7 @@ func (c *Client) updateDatabase() error {
 
 	tx, err := c.db.Begin()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer func() {
@@ -133,7 +134,27 @@ func (c *Client) updateDatabase() error {
 		)
 
 		if err != nil {
+			log.Printf("error occured while inserting new rows: %v, %+v", err, company)
 			tx.Rollback()
+			return nil, err
+		}
+	}
+
+	changeQuery := `update companies set phone=$1, address=$2, individual=$3, inn=$4 where name = $5`
+	for _, company := range change {
+		log.Printf("change: %+v", company)
+		_, err = tx.Exec(changeQuery,
+			company.Phone,
+			company.Address,
+			company.Individual,
+			company.INN,
+			company.Name,
+		)
+
+		if err != nil {
+			log.Printf("error occured while updating rows: %v", err)
+			tx.Rollback()
+			return nil, err
 		}
 	}
 
@@ -141,10 +162,10 @@ func (c *Client) updateDatabase() error {
 	_, err = tx.Exec(delQuery, pq.Array(delNames))
 	if err != nil {
 		tx.Rollback()
-		return err
+		return nil, err
 	}
 
-	return tx.Commit()
+	return newCompanies,tx.Commit()
 }
 
 func (c *Client) getCompanyList() ([]*types.Company, error) {
@@ -161,26 +182,32 @@ func (c *Client) getCompanyList() ([]*types.Company, error) {
 	return companies, err
 }
 
-func (c *Client) diff(companies []*types.Company) ([]*types.Company, []*types.Company) {
-	var add, del []*types.Company
+func (c *Client) diff(companies []*types.Company) ([]*types.Company, []*types.Company, []*types.Company, map[string]*types.Company) {
+	var add, del, change []*types.Company
 
 	var companyMap = make(map[string]*types.Company)
+	var newCompanies = make(map[string]*types.Company)
 
 	for _, company := range companies {
 		companyMap[company.Name] = company
 
-		if _, ok := c.companies[company.Name]; !ok {
+		if cc, ok := c.companies[company.Name]; !ok {
 			add = append(add, company)
-			c.companies[company.Name] = company
+			newCompanies[company.Name] = company
+		} else if company.Hash() != cc.Hash() {
+			// change
+			log.Printf("change: prev: %v new: %v", cc, company)
+			change = append(change, company)
+			newCompanies[company.Name] = company
 		}
 	}
 
 	for _, company := range c.companies {
 		if _, ok := companyMap[company.Name]; !ok {
 			del = append(del, company)
-			delete(c.companies, company.Name)
+			delete(newCompanies, company.Name)
 		}
 	}
 
-	return add, del
+	return add, del, change, newCompanies
 }
